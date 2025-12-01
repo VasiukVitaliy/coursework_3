@@ -8,6 +8,7 @@ import io
 from PIL import Image
 import httpx
 import base64
+import cv2
 
 load_dotenv("../.env")
 
@@ -58,7 +59,7 @@ async def get_status_task(task_id: str):
         result = task_res.result
         task_res.forget()
         result = base64.b64encode(result).decode('utf-8')
-        return {"status": "SUCCESSFUL", "result": result}
+        return {"status": "SUCCESS", "result": result}
     elif task_res.state == "FAILURE":
         result = str(task_res.result)
         task_res.forget()
@@ -108,7 +109,7 @@ async def predict_by_coord(bbox: List[float] = Query(...)):
     
     handfix = {
         "mask_task_id": task.id,
-        "properties": data["results"][0]["properties"]
+        "geojson": data
     }
 
     return handfix
