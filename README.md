@@ -28,7 +28,7 @@ Backend: Python, FastAPI, Celery (для асинхронності)
 
 ---
 
-## ⚙️ Швидкий Запуск
+## Швидкий Запуск(буде зміна)
 
 1.  Встановлення залежностей: `npm install` (у папці frontend) та `pip install -r requirements.txt` (для Python).
 2. Запустити у контейнері redis з відкритим портом
