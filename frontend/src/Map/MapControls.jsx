@@ -1,11 +1,8 @@
-// MapControls.js
-import React from 'react';
-
 const MapControls = ({ activeTool, onToolClick, onSave }) => {
     return (
         <aside className="w-80 bg-white flex flex-col border-r border-gray-200 shadow-xl z-10">
             <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-800">Road Editor</h2>
+                <h2 className="text-xl font-bold text-gray-800">Оновлення доріг</h2>
             </div>
             <div className="p-4 space-y-3">
                 <button 

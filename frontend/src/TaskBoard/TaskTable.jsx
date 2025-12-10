@@ -5,8 +5,13 @@ import StatusBadge from './StatusBadge';
 
 const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('uk-UA', {
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+    const utcDate = dateString.endsWith('Z') ? dateString : `${dateString}Z`;
+
+    return new Date(utcDate).toLocaleString('uk-UA', {
+        day: '2-digit', 
+        month: '2-digit', 
+        hour: '2-digit', 
+        minute: '2-digit'
     });
 };
 
@@ -62,7 +67,7 @@ const TaskTable = ({ tasks, onVectorize, onUpdateStatus }) => {
                                         <span>{formatDate(task.created_at)}</span>
                                         {hasChild && task.child_created_at && (
                                             <span className="text-xs text-gray-400 mt-1">
-                                                Upd: {formatDate(task.child_created_at)}
+                                                Дод. завдання: {formatDate(task.child_created_at)}
                                             </span>
                                         )}
                                     </div>
@@ -70,9 +75,9 @@ const TaskTable = ({ tasks, onVectorize, onUpdateStatus }) => {
 
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex flex-col items-start">
-                                        <StatusBadge status={task.status} label="Parent" />
+                                        <StatusBadge status={task.status} label="Екстракція" />
                                         {hasChild && (
-                                            <StatusBadge status={task.child_status} label="Child" />
+                                            <StatusBadge status={task.child_status} label="Постпроц" />
                                         )}
                                     </div>
                                 </td>
