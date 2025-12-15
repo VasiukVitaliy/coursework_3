@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TaskTable from './TaskTable'; 
 
-const API_URL = import.meta.env.VITE_BACKEND || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const TaskDashboard = () => {
     const [tasks, setTasks] = useState([]);
@@ -61,7 +61,7 @@ const TaskDashboard = () => {
 
     useEffect(() => {
         fetchTasks();
-        intervalRef.current = setInterval(fetchTasks, 3000); 
+        intervalRef.current = setInterval(fetchTasks, 10000); 
 
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);

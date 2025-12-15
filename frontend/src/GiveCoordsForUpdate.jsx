@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 
 export default function GiveCoordsForUpdate() {
@@ -7,6 +8,8 @@ export default function GiveCoordsForUpdate() {
   const [maxLat, setMaxLat] = useState('')
   const [minLon, setMinLon] = useState('')
   const [maxLon, setMaxLon] = useState('')
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
 
   const SERVER_URL = import.meta.env.REACT_APP_SERVER_URL;
 
@@ -17,12 +20,18 @@ export default function GiveCoordsForUpdate() {
     ["Права довгота", setMaxLon]
   ]
 
-    const sendCoords = async () => {
-        const response = await axios.get(
-            `${SERVER_URL}/predict-by-coord/
-            ?bbox=${minLat}bbox=${maxLat}bbox=${minLon}bbox=${maxLon}`)
-        
+  const sendCoords = async () => {
+    try {
+        setLoading(true)
+        const url = `${SERVER_URL}/predict-by-coord/?bbox=${minLon}&bbox=${minLat}&bbox=${maxLon}&bbox=${maxLat}`;
+        const response = await axios.post(url);
+        console.log(response.data);
+        setLoading(false)
+        navigate("/")
+    } catch (e) {
+        console.log(e);
     }
+  }
 
   return (
     <div className="flex justify-center items-center h-full">
@@ -43,7 +52,7 @@ export default function GiveCoordsForUpdate() {
           />
         </div>
       ))}
-        <button onClick={()=>sendCoords()}> Надіслати </button>
+        <button disabled={loading} onClick={()=>sendCoords()}> Надіслати </button>
     </div>
     </div>
   )

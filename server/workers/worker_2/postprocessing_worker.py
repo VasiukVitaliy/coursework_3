@@ -30,7 +30,6 @@ def pixel_to_gps(row, col, bbox, width, height):
     x_res = (east - west) / width
     y_res = (north - south) / height 
     
-    # +0.5 для центру пікселя
     lon = west + (col + 0.5) * x_res
     lat = north - (row + 0.5) * abs(y_res) 
     
@@ -40,8 +39,7 @@ def pixel_to_gps(row, col, bbox, width, height):
 def postprocess(npy_mask_url, geojson_meta=False):
     if not geojson_meta:
         return json.dumps({"type": "FeatureCollection", "features": []})
-    
-    # 1. Завантаження
+
     try:
         with httpx.Client() as client:
             img_npy = client.get(npy_mask_url)
@@ -49,7 +47,6 @@ def postprocess(npy_mask_url, geojson_meta=False):
     except:
         raise Exception("Cannot load mask from server")
 
-    # 2. Метадані
     try:
         bbox = geojson_meta.get('bbox')
         if not bbox and 'properties' in geojson_meta:
@@ -59,7 +56,6 @@ def postprocess(npy_mask_url, geojson_meta=False):
     except (KeyError, TypeError, AttributeError):
         return json.dumps({"type": "FeatureCollection", "features": []})
 
-    # 3. Декодування
     try:
         buf = io.BytesIO(img_npy)
         mask_2d = np.load(buf)
@@ -72,7 +68,6 @@ def postprocess(npy_mask_url, geojson_meta=False):
     if mask_2d.dtype != np.float32:
         mask_2d = mask_2d.astype(np.float32)
 
-    # 4. Скелетонізація
     ret, binary_mask = cv2.threshold(mask_2d, 0.5, 1.0, cv2.THRESH_BINARY)
     vectorized_mask = morphology.skeletonize(binary_mask > 0)
     
@@ -81,7 +76,6 @@ def postprocess(npy_mask_url, geojson_meta=False):
     raw_segments = []
     EPSILON = 2.0
 
-    # 5. Обробка
     for (s, e, data) in graph.edges(data=True):
         pts = data['pts']
 
@@ -96,14 +90,12 @@ def postprocess(npy_mask_url, geojson_meta=False):
             row, col = point[0]
             
             lon, lat = pixel_to_gps(row, col, bbox, meta_width, meta_height)
-            
-            # --- КРИТИЧНЕ ВИПРАВЛЕННЯ ТУТ ---
+
             line_coords.append([float(lon), float(lat)]) 
         
         if len(line_coords) >= 2:
             raw_segments.append(line_coords)
-            
-    # 6. Формування JSON
+
     features = []
     for line in raw_segments:
         feature = {

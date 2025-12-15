@@ -12,16 +12,17 @@ import os
 import base64
 import io
 import httpx
-from dataLoader import s3_client
+from core.dataLoader import s3_client
 
 load_dotenv("../.env")
+
+pathModel = os.getenv("PATHTOMODEL")
+bucketName = os.getenv("BUCKET_NAME")
 
 brokerHost = os.getenv("BROKERHOST")
 brokerPort = os.getenv("BROKERPORT")
 brokerDBWrite = os.getenv("BROKERDBWRITE")
 brokerDBRead = os.getenv("BROKERDBREAD")
-pathModel = os.getenv("PATHTOMODEL")
-bucketName = os.getenv("BUCKET_NAME")
 
 app = Celery("model_prediction", 
         broker=f"redis://{brokerHost}:{brokerPort}/{brokerDBWrite}",
@@ -48,7 +49,8 @@ inferer = SlidingWindowInferer(
 state_dict = torch.load(pathModel, map_location="cpu")
 model.load_state_dict(state_dict)
 model.to(device)
-#model = torch.compile(model)
+print("Model loaded")
+
 
 transform_gpu = v2.Compose([
     v2.ToDtype(torch.float32, scale=True),
@@ -76,8 +78,6 @@ def predict(image_url: str, bbox: list):
     except Exception:
         raise Exception("Cannot download file")
 
-    #scale = 0.5
-    #img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     img_tensor = torch.from_numpy(img).permute(2, 0, 1)
     img_tensor = transform_gpu(img_tensor).unsqueeze(0).to(device)
 

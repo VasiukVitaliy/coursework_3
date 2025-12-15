@@ -10,10 +10,10 @@ import httpx
 import base64
 import cv2
 import json
-from db import engine
+from .db import engine
 from sqlalchemy import text
 import numpy as np
-from dataLoader import s3_client
+from core.dataLoader import s3_client
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv("../.env")
@@ -49,34 +49,6 @@ celery_postprocess.conf.update(
     result_expires=3600 
 )
 
-@app.post("/predict")
-async def send_predict(
-    img: UploadFile = File(...), 
-    response: Response = None
-):
-    print("start")
-    try:
-        if img is None:
-            return Response(
-                content='{"error": "No image provided"}',
-                media_type="application/json",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-
-        print("before decoding")
-        content = await img.read()
-
-        print("before predicting")
-        task = celery_app.send_task("model_prediction.predict", args=[content])
-        print("end")
-        return {"status": "success", "task_id": task.id}
-
-    except Exception as e:
-        return Response(
-            content=f'{{"error": "{str(e)}"}}',
-            media_type="application/json",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 @app.put("/status/{task_id}")
 async def get_status_task(task_id: str, post: Annotated[bool, Query()] = False):
@@ -154,6 +126,11 @@ async def predict_by_coord(bbox: List[float] = Query(...)):
 
 @app.post("/vec-by-task/{task_id}")
 async def vec_by_task(task_id: str):
+    try: 
+        task_old = celery_app.AsyncResult(task_id)
+        task_old.forget()
+    except Exception as e:
+        pass
     query = text("""
         SELECT task_id, status, bbox, path
         FROM jobs
@@ -170,10 +147,6 @@ async def vec_by_task(task_id: str):
         raise HTTPException(400, "Завдання ще не виконано або виникла помилка")
     
     bbox = result['bbox']
-    
-    #task_res = celery_app.AsyncResult(task_id)
-    #if task_res.state != "SUCCESS":
-       #raise HTTPException(400, "Завдання ще не виконано або виникла помилка")
 
     
     img_meta_url = f"https://api.openaerialmap.org/meta?bbox={bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
@@ -219,33 +192,35 @@ async def vec_by_task(task_id: str):
             "child_id": task_vec.id
         })
         conn.commit()
-        
-    #task_res.forget()
+
 
     return updated
 
-# @app.post("load-map-db")
-# async def load_map(data = Body(...)):
-#     try:
-#         task_id = data.get("task_id")
-#         task_id_vec = data.get("task_id_vec")
-#         geojson = data.get("geojson")
-        
-#         query = text("""
-#             INSERT INTO maps (task_id, geojson)
-#             VALUES (:task_id, :geojson)
-#             RETURNING map_id, task_id;
-#         """)
-        
-#         with engine.connect() as conn:
-#             updated = conn.execute(query, {"tid": task_id}).mappings().first()
-#         conn.commit()
-        
-#         task_id_vec.forget()
-        
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+@app.post("/load-map-db/{task_id}")
+async def load_map(task_id: str, data: dict = Body(...)):
+    query = text("""
+        UPDATE map 
+        SET json_file = :json_data 
+        WHERE task_id = :tid
+    """)
 
+    try:
+        with engine.connect() as conn:
+            payload = json.dumps(data)
+
+            conn.execute(query, {
+                "tid": task_id,
+                "json_data": payload 
+            })
+            
+            conn.commit()
+            
+    except Exception as e:
+        print(f"Update error: {e}")
+        raise HTTPException(status_code=500, detail=f"Не вдалося оновити дані: {e}")
+
+    return {"status": "success", "task_id": task_id}
+        
 
 @app.get("/tasks/")
 async def get_tasks():
@@ -268,11 +243,60 @@ async def get_tasks():
         
     return results
 
+
+
 @app.get("/maps/{task_id}")
 async def get_map_by_task(task_id: str):
+    raw_result = None
     task_res = celery_postprocess.AsyncResult(task_id)
     
-    if task_res.state != "SUCCESS":
-        raise HTTPException(400, "Завдання ще не виконано або виникла помилка")
-    raw_result = task_res.result
-    return json.loads(raw_result)
+    if task_res.state == "SUCCESS":
+        raw_result = task_res.result
+        
+        insert_query = text("""
+            INSERT INTO map (task_id, json_file) 
+            VALUES (:tid, :rdata)
+            ON CONFLICT (task_id) DO NOTHING
+        """)
+        
+        try:
+            payload = json.dumps(raw_result) if not isinstance(raw_result, str) else raw_result
+            
+            with engine.connect() as conn:
+                conn.execute(insert_query, {"tid": task_id, "rdata": payload})
+                conn.commit()
+            
+            task_res.forget()
+            
+        except Exception as e:
+            print(f"DB Save Error: {e}")
+
+    else:
+        select_query = text("SELECT json_file FROM map WHERE task_id = :tid")
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(select_query, {"tid": task_id}).fetchone()
+                
+            if row:
+                raw_result = row[0]
+            elif task_res.state in ["PENDING", "STARTED", "RETRY"]:
+                raise HTTPException(status_code=202, detail="Завдання ще виконується")
+            else:
+                raise HTTPException(status_code=404, detail="Результат не знайдено")
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"DB Read Error: {e}")
+            raise HTTPException(status_code=500, detail="Помилка сервера при роботі з БД")
+
+    if raw_result is None:
+        return {}
+
+    if isinstance(raw_result, str):
+        try:
+            return json.loads(raw_result)
+        except:
+            return raw_result
+            
+    return raw_result

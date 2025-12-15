@@ -2,7 +2,7 @@ import boto3
 import dotenv
 import os
 
-dotenv.load_dotenv("../.env")
+dotenv.load_dotenv("./.env")
 
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_KEY_ID= os.getenv("AWS_SECRET_KEY_ID")

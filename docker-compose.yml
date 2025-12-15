@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    volumes:
+      - ./server/backend:/app/backend
+    environment:
+      - DATABASE_URL=postgresql:*****
+      - BROKERHOST=redis      
+      - BROKERPORT=6379
+      - BROKERDBWRITE=0
+      - BROKERDBREAD=1
+      - BROKERDBWRITEPOSTPROCESS=2
+      - BROKERDBREADPOSTPROCESS=3
+      - MAPAPI=https://api.openaerialmap.org
+      - BUCKET_NAME=pred-masks
+      - AWS_ACCESS_KEY_ID=****
+      - AWS_SECRET_KEY_ID=****
+      - AWS_ENDPOINT_URL=****
+    ports:                    
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  model_prediction:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker_model_image
+    volumes:
+      - ./server/workers/worker_1:/app/worker
+    environment:
+      - BROKERHOST=redis      
+      - BROKERPORT=6379
+      - BROKERDBWRITE=0
+      - BROKERDBREAD=1
+      - BUCKET_NAME=pred-masks
+      - PATHTOMODEL=./deeplab_4_bce_mobile.pth
+      - AWS_ACCESS_KEY_ID=****
+      - AWS_SECRET_KEY_ID=****
+      - AWS_ENDPOINT_URL=****
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  postprocessing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker_postprocess_image
+    volumes:
+      - ./server/workers/worker_2:/app/worker
+    environment:
+      - BROKERHOST=redis      
+      - BROKERPORT=6379
+      - BROKERDBWRITEPOSTPROCESS=2
+      - BROKERDBREADPOSTPROCESS=3
+      - BUCKET_NAME=pred-masks
+      - AWS_ACCESS_KEY_ID=****
+      - AWS_SECRET_KEY_ID=****
+      - AWS_ENDPOINT_URL=****
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend_image
+    volumes:
+      - ./frontend:/app       
+      - /app/node_modules     
+    ports:                    
+      - "5173:5173"
+    environment:
+      - REACT_APP_SERVER_URL=http://localhost:8000 
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:

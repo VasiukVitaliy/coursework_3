@@ -1,4 +1,3 @@
-// components/TaskTable.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge'; 
@@ -88,7 +87,7 @@ const TaskTable = ({ tasks, onVectorize, onUpdateStatus }) => {
                                             onClick={() => onVectorize(task.task_id)}
                                             className="inline-flex items-center px-3 py-1.5 border border-transparent rounded shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition mr-2"
                                         >
-                                            🚀 Старт
+                                            Векторизувати
                                         </button>
                                     )}
 
